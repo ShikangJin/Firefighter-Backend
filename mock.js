@@ -4,7 +4,7 @@ const server = require('http').createServer(app);
 const moment = require('moment');
 var admin = require("firebase-admin");
 
-var serviceAccount = require("./firefighter-38b3e-firebase-adminsdk-huv2x-a587fc6883.json");
+var serviceAccount = require("./firebaseAuth.json");
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
