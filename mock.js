@@ -1,6 +1,6 @@
 const express = require('express');
 const app = express();
-const server = require('http').createServer(app);
+// const server = require('http').createServer(app);
 const moment = require('moment');
 var admin = require("firebase-admin");
 
@@ -12,74 +12,72 @@ admin.initializeApp({
   });
 
 var db = admin.database();
+var squads = db.ref('/squads');
 
 app.get('/mockData', (req, res) => {
-    db.ref('/').update({   
-        squads: mockData()
-    }) 
+    mockData();
+    res.send('mocked data');
 })
 
 app.get('/mockHistoryData', (req, res) => {
-    db.ref('/').update({   
-        history: mockHistoryData()
-    }) 
+    mockHistoryData();
+    res.send('mocked history data');
 })
 
 function mockData() {
-    let id = 0;
-    const squadsData = [null, null, null, null, null, null, null, null, null, null];
-    squadsData.forEach((_, idx) => {
-        if (squadsData[idx] === null) {
-            squadsData[idx] = [];
-        }
-        let squadData = squadsData[idx];
-        for (let i = 0; i < 3; i++) {
-            let curTime = moment(new Date().getTime());
-            squadData.push({
-                id: id,
-                key: id,
-                name: 'Member' + id,
-                squad: 'Squad' + idx,
-                status: Math.random() < 0.2 ? 'bad' : 'good',
-                age: 20 + Math.floor(Math.random() * 20),
-                bodyTemp: (36 + Math.random() * 2).toFixed(1),
-                location: {
+    squads.once('value', function(snapshot) {
+        let data = snapshot.val();
+        let curTime = moment(new Date().getTime());
+        Object.keys(data).forEach(squad => {
+            Object.keys(data[squad]).forEach(member => {
+                let curMember = data[squad][member];
+                curMember.status = Math.random() < 0.2 ? 'bad' : 'good';
+                curMember.bodyTemp = (36 + Math.random() * 2).toFixed(1);
+                curMember.location = {
                     lat: (-3.745 + Math.random() * 0.01).toFixed(3),
                     lng: (-38.523 + Math.random() * 0.01).toFixed(3),
-                },
-                timestamp: curTime.format('L'),
-                timeDetail: curTime.format('LTS'),
-                heartRate: Math.floor(60 + Math.random() * 40),
-                coLevel: (0.02 + Math.random() * 0.08).toFixed(4),
-                missionTime: Math.floor(Math.random() * 120),
-                airQuality: Math.floor((Math.random() * 100)),
-            });
-            id++;
-        }
-    });
-    return squadsData;
+                };
+                curMember.timestamp = curTime.format('L');
+                curMember.timeDetail = curTime.format('LTS');
+                curMember.heartRate = Math.floor(60 + Math.random() * 40);
+                curMember.coLevel = (0.02 + Math.random() * 0.08).toFixed(4);
+                curMember.missionTime = Math.floor(Math.random() * 120);
+                curMember.airQuality = Math.floor((Math.random() * 100));
+            })
+        });
+        db.ref('/').update({   
+            squads: data
+        }) 
+    })
 }
 
 function mockHistoryData() {
-    let result = [];
+    const result = {};
     const beginDay = new Date().getTime();
-    for (let idx = 0; idx < 30; idx++) {
-        let returnData = [];
-        for (let i = 0; i < 10; i += 1) {
-            returnData.push({
-                id: idx,
-                time: moment(new Date(beginDay + 1000 * 60 * 60 * 24 * i)).format('YYYY-MM-DD'),
-                bodyTemp: (36 + Math.random() * 2).toFixed(1),
-                heartRate: Math.floor(60 + Math.random() * 40),
-            });
-        }
-        result.push(returnData);
-    }
-    return result;
+    squads.once("value", function(snapshot) {
+        Object.keys(snapshot.val()).forEach(squad => {
+            Object.keys(snapshot.val()[squad]).forEach(member => {
+                let curMember = snapshot.val()[squad][member];
+                let returnData = [];
+                for (let i = 0; i < 10; i += 1) {
+                    returnData.push({
+                        id: curMember.id,
+                        time: moment(new Date(beginDay + 1000 * 60 * 60 * 24 * i)).format('YYYY-MM-DD'),
+                        bodyTemp: (36 + Math.random() * 2).toFixed(1),
+                        heartRate: Math.floor(60 + Math.random() * 40),
+                    });
+                }
+                result[curMember.id] = returnData;
+            });         
+        });
+        db.ref('/').update({   
+            history: result
+        }); 
+    });
 }
 
-app.set('port', 3001);
+// app.set('port', );
 
-server.listen(app.get('port'), function() {
-    console.log('start at port:' + server.address().port);
+app.listen(3001, function() {
+    console.log('start at port 3001');
 });
