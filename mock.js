@@ -13,6 +13,42 @@ admin.initializeApp({
 
 var db = admin.database();
 var squads = db.ref('/squads');
+var realtime = db.ref('/realtime');
+
+app.get('/mockMember', (req, res) => {
+    mockMember();
+    res.send('mocked member');
+})
+
+function mockMember() {
+    const teamname = ['a'];
+    let data = {}, realtime = {};
+    let idx = 0;
+    teamname.forEach(team => {
+        data[team] = {}; 
+    })
+    Object.keys(data).forEach(team => {
+        data[team][`id ${idx}`] = {
+            age: 21,
+            id: idx,
+            key: idx,
+            name: 'tester ' + idx,
+            squad: team,
+            status: 'good',
+        }
+        realtime[`id ${idx}`] = {
+            squad: team,
+        }
+        idx++;
+    });
+
+    db.ref('/').update({   
+        squads: data,
+        realtime: realtime
+    });
+
+    
+}
 
 app.get('/mockData', (req, res) => {
     mockData();
@@ -25,30 +61,29 @@ app.get('/mockHistoryData', (req, res) => {
 })
 
 function mockData() {
-    squads.once('value', function(snapshot) {
+    realtime.once('value', function(snapshot) {
         let data = snapshot.val();
         let curTime = moment(new Date().getTime());
-        Object.keys(data).forEach(squad => {
-            Object.keys(data[squad]).forEach(member => {
-                let curMember = data[squad][member];
-                curMember.status = Math.random() < 0.2 ? 'bad' : 'good';
-                curMember.bodyTemp = (36 + Math.random() * 2).toFixed(1);
-                curMember.location = {
-                    lat: (-3.745 + Math.random() * 0.01).toFixed(3),
-                    lng: (-38.523 + Math.random() * 0.01).toFixed(3),
-                };
-                curMember.timestamp = curTime.format('L');
-                curMember.timeDetail = curTime.format('LTS');
-                curMember.heartRate = Math.floor(60 + Math.random() * 40);
-                curMember.coLevel = (0.02 + Math.random() * 0.08).toFixed(4);
-                curMember.missionTime = Math.floor(Math.random() * 120);
-                curMember.airQuality = Math.floor((Math.random() * 100));
-            })
+        Object.keys(data).forEach(id => {
+            let curMember = data[id];
+            curMember.status = Math.random() < 0.2 ? 'MayDay' : 'good';
+            curMember.bodyTemp = (36 + Math.random() * 2).toFixed(1);
+            curMember.location = {
+                lat: (-3.745 + Math.random() * 0.01).toFixed(3),
+                lng: (-38.523 + Math.random() * 0.01).toFixed(3),
+            };
+            curMember.timestamp = curTime.format('L');
+            curMember.timeDetail = curTime.format('LTS');
+            curMember.heartRate = Math.floor(60 + Math.random() * 40);
+            curMember.coLevel = (0.02 + Math.random() * 0.08).toFixed(4);
+            curMember.missionTime = Math.floor(Math.random() * 120);
+            curMember.airQuality = Math.floor((Math.random() * 100));
         });
         db.ref('/').update({   
-            squads: data
+            realtime: data
         }) 
-    })
+        // console.log(data);
+    });
 }
 
 function mockHistoryData() {
@@ -67,7 +102,7 @@ function mockHistoryData() {
                         heartRate: Math.floor(60 + Math.random() * 40),
                     });
                 }
-                result[curMember.id] = returnData;
+                result['id ' + curMember.id] = returnData;
             });         
         });
         db.ref('/').update({   
