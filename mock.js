@@ -3,12 +3,12 @@ const app = express();
 // const server = require('http').createServer(app);
 const moment = require('moment');
 var admin = require("firebase-admin");
-
+var { databaseURL } = require('./configData');
 var serviceAccount = require("./firebaseAuth.json");
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    databaseURL: "https://firefighter-38b3e.firebaseio.com"
+    databaseURL: databaseURL
   });
 
 var db = admin.database();
@@ -19,6 +19,29 @@ app.get('/mockMember', (req, res) => {
     mockMember();
     res.send('mocked member');
 })
+
+app.get('/mockAccount', (req, res) => {
+    mockAccount();
+    res.send('mocked account');
+})
+
+function mockAccount() {
+    let account1 = {
+        username: 'admin',
+        password: 'firefighter',
+        tags: ['Fire Boundray', 'Emergency Area'],
+    }
+    let account2 = {
+        username: 'user',
+        password: 'firefighter',
+        tags: ['Fire Boundray', 'Emergency Area'],
+    }
+    let accountRef = db.ref('/').child('accounts');
+    accountRef.set({
+        'user 1': account1,
+        'user 2': account2,
+    });
+}
 
 function mockMember() {
     const teamname = ['a'];
@@ -34,7 +57,7 @@ function mockMember() {
             key: idx,
             name: 'tester ' + idx,
             squad: team,
-            status: 'good',
+            status: 'unknown',
         }
         realtime[`id ${idx}`] = {
             squad: team,
@@ -66,18 +89,17 @@ function mockData() {
         let curTime = moment(new Date().getTime());
         Object.keys(data).forEach(id => {
             let curMember = data[id];
-            curMember.status = Math.random() < 0.2 ? 'MayDay' : 'good';
-            curMember.bodyTemp = (36 + Math.random() * 2).toFixed(1);
+            curMember.status = Math.random() < 0.2 ? 'Mayday' : 'good';
+            curMember.humidity = (36 + Math.random() * 2).toFixed(1);
             curMember.location = {
                 lat: (-3.745 + Math.random() * 0.01).toFixed(3),
                 lng: (-38.523 + Math.random() * 0.01).toFixed(3),
             };
             curMember.timestamp = curTime.format('L');
             curMember.timeDetail = curTime.format('LTS');
-            curMember.heartRate = Math.floor(60 + Math.random() * 40);
-            curMember.coLevel = (0.02 + Math.random() * 0.08).toFixed(4);
-            curMember.missionTime = Math.floor(Math.random() * 120);
-            curMember.airQuality = Math.floor((Math.random() * 100));
+            curMember.pressure = Math.floor(60 + Math.random() * 40);
+            curMember.proximity = (0.02 + Math.random() * 0.08).toFixed(4);
+            curMember.temperature = Math.floor(Math.random() * 120);
         });
         db.ref('/').update({   
             realtime: data
@@ -97,9 +119,10 @@ function mockHistoryData() {
                 for (let i = 0; i < 10; i += 1) {
                     returnData.push({
                         id: curMember.id,
-                        time: moment(new Date(beginDay + 1000 * 60 * 60 * 24 * i)).format('YYYY-MM-DD'),
+                        time: moment(new Date(beginDay + 1000 * 60 * 60 * 24 * i)).format('MMMM Do YYYY, h:mm:ss a'),
                         bodyTemp: (36 + Math.random() * 2).toFixed(1),
                         heartRate: Math.floor(60 + Math.random() * 40),
+                        temp: Math.floor(Math.random() * 5 + 20),
                     });
                 }
                 result['id ' + curMember.id] = returnData;
