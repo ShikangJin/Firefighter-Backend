@@ -5,7 +5,6 @@ const app = express();
 const server = require('http').createServer(app);
 const io = require('socket.io')(server);
 const bodyParser = require('body-parser');
-var GPS = require('gps');
 var { PubSub } = require('@google-cloud/pubsub'); 
 var admin = require("firebase-admin");
 var { databaseURL, projectId, stateSubscriber } = require('./configData');
@@ -21,7 +20,6 @@ var squads = db.ref("/squads");
 var realtime = db.ref('/realtime');
 var history = db.ref('/history');
 var accounts = db.ref('/accounts');
-var mGps = new GPS;
 const MAX_HISTORY_DATA_AMOUNT = 500;
  
 // Instantiates a client 
@@ -45,36 +43,40 @@ app.post('/login', (req, res) => handleLogin(req, res))
 function handleLogin(req, res) {
     const { password, userName, type } = req.body;
     console.log(req.body);
-    accounts.once('value', function(snapshot) {
-        let accountList = snapshot.val();
-        Object.keys(accountList).forEach(user => {
-            if (accountList[user].username === userName && accountList[user].password === password) {
-                console.log('success');
+    try { 
+        accounts.once('value', function(snapshot) {
+            let accountList = snapshot.val();
+            Object.keys(accountList).forEach(user => {
+                if (accountList[user].username === userName && accountList[user].password === password) {
+                    console.log('success');
+                    return res.json({
+                        status: 'ok',
+                        type,
+                        currentAuthority: 'admin',
+                        tags: accountList[user].tags,
+                    });
+                }
+            })
+    
+            if (!res.headersSent) {
                 return res.json({
-                    status: 'ok',
+                    status: 'error',
                     type,
-                    currentAuthority: 'admin',
-                    tags: accountList[user].tags,
+                    currentAuthority: 'guest',
                 });
             }
-        })
-
-        if (!res.headersSent) {
-            return res.json({
-                status: 'error',
-                type,
-                currentAuthority: 'guest',
-            });
-        }
-       
-    });
-    // res.send({
-    //     status: 'database error',
-    // })
+           
+        });
+    } catch(error) {
+        return res.json({
+            status: 'error',
+            type,
+            currentAuthority: 'guest',
+        });
+    }
 }
 
 function addMember(req, res) {
-    // console.log(req.body);
     try {
         db.ref('/nextID').once("value", function(snapshot) {
             let curID = snapshot.val();   
@@ -131,58 +133,55 @@ io.on('connection', function(socket) {
 
     var messageHandler = function(message) { 
         console.log('Message Begin >>>>>>>>'); 
-        // console.log('message.connectionId', message.connectionId); 
-        // console.log('message.attributes', message.attributes); 
         try {
             let messageBody = Buffer.from(message.data, 'base64').toString('ascii');
             console.log(messageBody);
-        
-            var indBeg = messageBody.indexOf('gps');
-            // console.log(indBeg);
-            var indEnd = messageBody.indexOf('}');
-            // console.log(indEnd);
-        
-            let copyData = JSON.parse(messageBody.slice(0, indBeg - 2)+ '}');
-        
-            // get the "gps" till right before the end
-            var gpsData = messageBody.substring(indBeg - 1, indEnd - 1);
-            // console.log("GPS: " + gpsData);
-        
-            // get the gngga sentence from the message
-            var nggaBeg = gpsData.indexOf('$GNGG');
-            var nggaEnd = gpsData.indexOf('\n', nggaBeg + 1);
-            // var gngga = gpsData.substring(nggaBeg, nggaEnd);
-            // these might need to change depending if we get NGGA or GNGGA data
-            var gngga = gpsData.slice(nggaBeg, nggaEnd - 1);
+            let copyData = JSON.parse(messageBody);
             
-            mGps.update(gngga);
-           
-            console.log(mGps.state);
-            // console.log('message.data', data); 
-            console.log('Message End >>>>>>>>>>'); 
-            let sentData = {'id 0': {}};
-            sentData['id 0']['temperature'] = copyData['temp'];
-            sentData['id 0']['squad'] = 'a';
-            sentData['id 0']['status'] = copyData['status'];
-            sentData['id 0']['location'] = {'lat': 0, 'lng': 0}
-            if (mGps.state != null) {
-                sentData['id 0']['location']['lat'] = mGps.state.lat;
-                sentData['id 0']['location']['lng'] = mGps.state.lon;
-            }
-            // console.log(sentData);
-            io.emit('update', sentData);
-            history.child('id 0').once('value', function(snapshot) {
-                let historyArr = snapshot.val();
-                if (historyArr.length == MAX_HISTORY_DATA_AMOUNT) {
-                    historyArr.shift();
-                } 
-                historyArr.push({
-                    temp: copyData['temp'],
-                    id: 0,
-                    time: moment(new Date()).format('MMMM Do YYYY, h:mm:ss a'),
+            if (!copyData.LedOn) {
+                let sentData = {
+                    'id 0': {
+                        temperature: copyData['temp'],
+                        squad: 'a',
+                        status: copyData['status'],
+                        location: {
+                            lat: copyData['gpsLat'],
+                            lng: copyData['gpsLong']
+                        },
+                        ppb: copyData['PPB'],
+                        rh: copyData['RH'],
+                        acc: {
+                            x: copyData['acc_x'],
+                            y: copyData['acc_y'],
+                            z: copyData['acc_z'],
+                        },
+                        gyro: {
+                            x: copyData['gyro_x'],
+                            y: copyData['gyro_y'],
+                            z: copyData['gyro_z'],
+                        },
+                        pressure: copyData['pres'],
+                        status: copyData['status'],
+                    }
+                };
+                console.log(sentData);
+                io.emit('update', sentData);
+                history.child('id 0').once('value', function(snapshot) {
+                    let historyArr = snapshot.val();
+                    if (historyArr.length == MAX_HISTORY_DATA_AMOUNT) {
+                        historyArr.shift();
+                    } 
+                    historyArr.push({
+                        temp: copyData['temp'],
+                        id: 0,
+                        time: moment(new Date()).format('MMMM Do YYYY, h:mm:ss a'),
+                    });
+                    history.child('id 0').set(historyArr);
                 });
-                history.child('id 0').set(historyArr);
-            });
+            }
+        
+            console.log('Message End >>>>>>>>>>'); 
+            
         } catch (error) {
             console.log(error);
         }

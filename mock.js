@@ -100,6 +100,8 @@ function mockData() {
             curMember.pressure = Math.floor(60 + Math.random() * 40);
             curMember.proximity = (0.02 + Math.random() * 0.08).toFixed(4);
             curMember.temperature = Math.floor(Math.random() * 120);
+            curMember.ppb = Math.floor(-2000 - Math.random() * 500);
+            curMember.rh = Math.floor(55 + Math.random() * 2);
         });
         db.ref('/').update({   
             realtime: data
