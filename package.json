@@ -14,7 +14,7 @@
     "express": "^4.17.1",
     "firebase-admin": "^8.1.0",
     "gps": "^0.5.3",
-    "moment": "^2.24.0",
+    "moment": "^2.29.4",
     "socket.io": "^2.2.0"
   }
 }
